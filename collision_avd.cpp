@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
@@ -16,13 +17,13 @@ void status0(nav_msgs::Odometry msg1){
      a=msg1.pose.pose.position.x;
      b=msg1.pose.pose.position.y;
      c=msg1.pose.pose.position.z;
-    ROS_INFO("%f %f %f ",a,b,c);
+    //ROS_INFO("%f %f %f ",a,b,c);
 }
 void status1(nav_msgs::Odometry msg1){
      d=msg1.pose.pose.position.x;
      e=msg1.pose.pose.position.y;
      f=msg1.pose.pose.position.z;
-    ROS_INFO("%f %f %f ",d,e,f);
+    //ROS_INFO("%f %f %f ",d,e,f);
 }
 
 int main(int argc, char **argv)
@@ -33,18 +34,19 @@ int main(int argc, char **argv)
    ros::Subscriber sub1 = nh.subscribe("uav0/mavros/local_position/odom", 10,status0);
    ros::Subscriber sub2 = nh.subscribe("uav1/mavros/local_position/odom", 10,status1);
    ros::Publisher local_pub = nh.advertise<geometry_msgs::PoseStamped> ("uav0/mavros/setpoint_position/local", 10);
+   ros::Publisher local_pub_vel = nh.advertise<geometry_msgs::TwistStamped> ("uav0/mavros/setpoint_velocity/cmd_vel", 10);
     ros::ServiceClient setmode = nh.serviceClient<mavros_msgs::SetMode>("uav0/mavros/set_mode");
-    ros::ServiceClient arming= nh.serviceClient<mavros_msgs::CommandBool>("uav0/mavros/cmd/arming");
-    ros::ServiceClient takeoff= nh.serviceClient<mavros_msgs::CommandTOL>("uav0/mavros/cmd/takeoff");  
+    ros::ServiceClient arming= nh.serviceClient<mavros_msgs::CommandBool>("uav0/mavros/cmd/arming");  
     ros::Rate rate(20);      
    while(ros::ok() &&!flag){
     ros::spinOnce();
     rate.sleep();
 }
 geometry_msgs::PoseStamped set;
+geometry_msgs::TwistStamped vel;
     set.pose.position.x =0;
     set.pose.position.y = 0;
-    set.pose.position.z = 2;
+    set.pose.position.z = 1;
     for(int i = 100; ros::ok() && i > 0; --i){
         local_pub.publish(set);
         ros::spinOnce();
@@ -54,7 +56,6 @@ mavros_msgs::SetMode mode;
 mode.request.custom_mode="OFFBOARD";
 mavros_msgs::CommandBool arm;
 arm.request.value = true;
-mavros_msgs::CommandTOL take;
 while(ros::ok()&&!flag1){
     setmode.call(mode);
     arming.call(arm);
@@ -62,18 +63,16 @@ while(ros::ok()&&!flag1){
     ros::spinOnce();
     rate.sleep();
 }
-for(int i=0;ros::ok() && i < 10*20; ++i){
+for(int i=0;ros::ok() && i < 10*200; ++i){
     local_pub.publish(set);
 }
 for(int i = 0; ros::ok() && i < 10*2000; ++i){
-       if((fabs(a-d)>0.5)&&(fabs(b-e)>0.5)) local_pub.publish(set);
+       if((fabs((a-d)*(a-d)+(b-e)*(b-e))>0.05)) local_pub.publish(set);
        else {
-           set.pose.position.x =-(d-a);
-    set.pose.position.y = e-b;
-    set.pose.position.z = 2; 
-           for (int i=0;i<100;i++){
-    local_pub.publish(set);
-    } 
+           vel.twist.linear.x =-(e-b);
+    vel.twist.linear.y = d-a;
+    vel.twist.linear.z = 0;
+    local_pub_vel.publish(vel);
        }
       ros::spinOnce();
       rate.sleep();
