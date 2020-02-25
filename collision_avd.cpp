@@ -16,7 +16,7 @@ void check(mavros_msgs::State msg){
     mode_check=msg.mode;
 }*/
 mavros_msgs::State current_state;
-float a,b,c,d,e,f;
+float a,b,c,d,e,f,vel;
 void check(const mavros_msgs::State::ConstPtr& msg){
     current_state = *msg;
 }
@@ -32,6 +32,12 @@ void status1(nav_msgs::Odometry msg1){
      f=msg1.pose.pose.position.z;
      ROS_INFO("%f %f %f ",d,e,f);
 }
+void status2(geometry_msgs::TwistStamped msg){
+    int x,y;
+    x=msg.twist.linear.x;
+    y=msg.twist.linear.y;
+    vel=sqrt(x*x+y*y);
+}
 
 int main(int argc, char **argv)
 {
@@ -40,6 +46,7 @@ int main(int argc, char **argv)
     ros::Subscriber sub = nh.subscribe("uav0/mavros/state", 10, check);
     ros::Subscriber sub1 = nh.subscribe("uav0/mavros/local_position/odom", 10,status0);
     ros::Subscriber sub2 = nh.subscribe("uav1/mavros/local_position/odom", 10,status1);
+    ros::Subscriber sub3 = nh.subscribe("uav1/mavros/local_position/velocity", 10,status2);
     ros::Publisher local_pub = nh.advertise<geometry_msgs::PoseStamped> ("uav0/mavros/setpoint_position/local", 10);
     ros::ServiceClient setmode = nh.serviceClient<mavros_msgs::SetMode>("uav0/mavros/set_mode");
     ros::ServiceClient arming= nh.serviceClient<mavros_msgs::CommandBool>("uav0/mavros/cmd/arming");  
@@ -71,10 +78,13 @@ int main(int argc, char **argv)
         rate.sleep();
     }
     while(ros::ok()){
-           if((fabs((a-d-10)*(a-d-10)+(b-e)*(b-e))>2)) local_pub.publish(set);
-           while((fabs((a-d-10)*(a-d-10)+(b-e)*(b-e))<2)){
-              set.pose.position.x=a-((a-d-10)/(b-e));
-              set.pose.position.y=b-((a-d-10)/(b-e));
+           if((a-d-10)*(a-d-10)+(b-e)*(b-e)>(5+10*vel)) {local_pub.publish(set);
+           set.pose.position.x=0;
+          set.pose.position.y=0;
+          set.pose.position.z=3;}
+           while((a-d-10)*(a-d-10)+(b-e)*(b-e)<(5+10*vel)){
+              set.pose.position.x=-(b-e);
+              set.pose.position.y=(a-d-10);
               set.pose.position.z=3;
               local_pub.publish(set);
               ros::spinOnce();
